@@ -8,23 +8,28 @@ import { Flavours } from '@/components/sections/Flavours';
 import { ScrollReveal } from '@/components/animations/ScrollReveal';
 import { ParallaxContainer } from '@/components/animations/ParallaxContainer';
 import { motion, AnimatePresence } from 'framer-motion';
-import Image from "next/image";
 
 export default function Home() {
   const [cartCount, setCartCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [currentSection, setCurrentSection] = useState(0);
+  const [mounted, setMounted] = useState(false);
 
+  // Fix SSR hydration issues
   useEffect(() => {
+    setMounted(true);
+    
     // Simulate loading time for premium experience
     const timer = setTimeout(() => {
       setIsLoading(false);
-    }, 2000);
+    }, 4000);
 
     return () => clearTimeout(timer);
   }, []);
 
   useEffect(() => {
+    if (!mounted) return;
+
     const handleScroll = () => {
       const sections = document.querySelectorAll('section');
       const scrollPosition = window.scrollY + window.innerHeight / 2;
@@ -39,12 +44,21 @@ export default function Home() {
       });
     };
 
+    // Control body overflow safely
+    if (isLoading) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'auto';
+    }
+
     window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+      document.body.style.overflow = 'auto'; // Cleanup
+    };
+  }, [mounted, isLoading]);
 
   const handleCartClick = () => {
-    // Cart functionality would go here
     console.log('Cart clicked');
   };
 
@@ -59,11 +73,6 @@ export default function Home() {
       initial={{ opacity: 1 }}
       animate={{ opacity: isLoading ? 1 : 0 }}
       transition={{ duration: 0.5 }}
-      onAnimationComplete={() => {
-        if (!isLoading) {
-          document.body.style.overflow = 'auto';
-        }
-      }}
     >
       <div className="text-center">
         <motion.div
@@ -97,7 +106,7 @@ export default function Home() {
     <motion.div
       className="fixed right-8 top-1/2 transform -translate-y-1/2 z-40 space-y-4"
       initial={{ opacity: 0, x: 20 }}
-      animate={{ opacity: isLoading ? 0 : 1, x: 0 }}
+      animate={{ opacity: (!mounted || isLoading) ? 0 : 1, x: 0 }}
       transition={{ delay: 2.5 }}
     >
       {['Hero', 'Experience', 'Flavours'].map((section, index) => (
@@ -108,6 +117,7 @@ export default function Home() {
           }`}
           whileHover={{ scale: 1.2 }}
           onClick={() => {
+            if (!mounted) return;
             const element = document.querySelector(`section:nth-child(${index + 1})`);
             element?.scrollIntoView({ behavior: 'smooth' });
           }}
@@ -146,8 +156,9 @@ export default function Home() {
     </div>
   );
 
-  if (isLoading) {
-    document.body.style.overflow = 'hidden';
+  // Prevent SSR mismatch
+  if (!mounted) {
+    return null;
   }
 
   return (
